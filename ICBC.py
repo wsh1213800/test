@@ -1,11 +1,7 @@
 import random
-
-bank = {'1': {'username': '1', 'password': '1', 'country': '1', 'province': '1', 'street': '1', 'door': '1',
-              'bank_name': '中国工商银行', 'money': 1000},
-        '2': {'username': '1', 'password': '1', 'country': '1', 'province': '1', 'street': '1', 'door': '1',
-              'bank_name': '中国工商银行', 'money': 0}}
+from DBUtils import select
+from DBUtils import update
 bank_name = "中国工商银行"
-
 
 def useradd():
     account = str(random.randint(10000000, 99999999))
@@ -15,6 +11,7 @@ def useradd():
     province = input("\t\t请输入您的省份")
     street = input("\t\t请输入你的街道")
     door = input("\t\t请输入您的门牌号")
+
     gift = bankadd(account, username, password, country, province, street, door)  # 位置对应
     if gift == "1":
         print("开户成功,一下是您的详细信息")
@@ -30,8 +27,7 @@ def useradd():
                     7、门牌：%s
                     8、余额：%s
         '''
-        print(info % (account, username, country, province, street, door, bank[account]["money"]))
-        print(bank)
+        print(info % (account, username, country, province, street, door, 0))
     elif gift == "2":
         print("请使用其他用户")
     elif gift == "3":
@@ -40,58 +36,81 @@ def useradd():
 
 # 往字典里面存数据
 def bankadd(account, username, password, country, province, street, door):
-    if account in bank:  # 姓名在不在bank的键里
+    sql1 = "select * from user where account = %s"
+    param1 = [account]
+    data1 = select(sql1, param1)
+    if len(data1) > 0:
         return "2"
-    elif len(bank) >= 100:
+    sql = "select count(*) from user"  # (5)
+    param = []
+    data = select(sql, param)
+    if data[0][0] >= 100:
         return "3"
-    bank[account] = {
-        "username": username,  # 从useradd的account获取的随机数
-        "password": password,
-        "country": country,
-        "province": province,
-        "street": street,
-        "door": door,
-        "bank_name": bank_name,
-        "money": 0
-    }
+    sql2 = " insert into user values(%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    param2 = [account, username, password, country, province, street, door, 0, bank_name]
+    update(sql2, param2)
+    # bank[account] = {
+    #     "username": username,  # 从useradd的account获取的随机数
+    #     "password": password,
+    #     "country": country,
+    #     "province": province,
+    #     "street": street,
+    #     "door": door,
+    #     "bank_name": bank_name,
+    #     "money": 0
+    # }
     return "1"
 
 
 def storage(ca, cb):  # 存钱
-    if ca in bank:
-        bank[ca]['money'] += cb
-        print("存钱成功，账户余额为" + str(bank[ca]['money']))
-    elif ca not in bank:
+    sql1 = "select * from user where account = %s"
+    param1 = [ca]
+    data1 = select(sql1, param1)
+    if len(data1)>0:
+        sql2="update user  set  money = money + %s where account=%s"
+        param = [int(cb),ca]
+        update(sql2,param)
+    elif len(data1)==0:
         return False
-    print(bank)
 
 
 def withdraw(qa, qb, qc):  # 取钱
-    if qa not in bank:
+    sql1 = "select * from user where account = %s"
+    param1 = [qa]
+    data1 = select(sql1, param1)
+    if len(data1)==0:
         return "1"
-    elif qa in bank:
-        if qb == bank[qa]['password']:
-            if bank[qa]['money'] >= qc:
-                bank[qa]['money'] -= qc
-                print("取钱成功，账户余额为" + str(bank[qa]['money']))
+    elif len(data1)>0:
+        if qb == data1[0][2]:
+            if data1[0][7] >= qc:
+                sql2 = "update user  set  money = money - %s where account=%s"
+                param = [int(qc), qa]
+                update(sql2, param)
                 return "0"
             else:
                 return "3"
         else:
             return "2"
-    print(bank)
 
 
 def transfer_accounts(za, zb, zc, zd):  # 转账
+    sql1 = "select * from user where account = %s"
+    param1 = [za]
+    data1 = select(sql1, param1)
     if za != zb:
-        if za in bank:
-            if zb in bank:
-                if zc == bank[za]['password']:
-                    if bank[za]['money'] >= zd:
-                        bank[za]['money'] -= zd
-                        bank[zb]['money'] += zd
-                        print("转账成功，账户余额为" + str(bank[za]['money']))
-                        print("收到转账，账户余额为" + str(bank[zb]['money']))
+        if len(data1[0])>0:
+            sql2 = "select * from user where account = %s"
+            param2 = [zb]
+            data2 = select(sql2, param2)
+            if len(data2[0])>0:
+                if zc == data1[0][2]:
+                    if data1[0][7] >= zd:
+                        sql2 = "update user  set  money = money - %s where account=%s"
+                        param = [int(zd), za]
+                        update(sql2, param)
+                        sql2 = "update user  set  money = money + %s where account=%s"
+                        param = [int(zd), zb]
+                        update(sql2, param)
                     else:
                         return "3"
                 else:
@@ -105,8 +124,11 @@ def transfer_accounts(za, zb, zc, zd):  # 转账
 
 
 def inquire(cxa, cxb):  # c查询
-    if cxa in bank:
-        if bank[cxa]['password']==cxb:
+    sql1 = "select * from user where account = %s"
+    param1 = [cxa]
+    data1 = select(sql1, param1)
+    if len(data1[0])>0:
+        if data1[0][2]==cxb:
             print("查询成功,以下是您的详细信息")
             information = '''
                             --------工商银行-------
@@ -120,8 +142,7 @@ def inquire(cxa, cxb):  # c查询
                                 8、余额：%s
                             '''
             print(information % (
-            cxa, bank[cxa]["username"], bank[cxa]["password"], bank[cxa]["province"],
-            bank[cxa]["street"], bank[cxa]["door"], bank[cxa]["money"]))
+            cxa, data1[0][1], data1[0][3], data1[0][4], data1[0][5], data1[0][6], str(data1[0][7])))
         else:
             print("密码不正确")
     else:
